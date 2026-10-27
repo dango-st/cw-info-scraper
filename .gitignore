@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Secrets / local config (copy .env.example to .env)
+.env
+.env.*
+!.env.example
+
+# Scraped data (contains personal info)
+output/
+*.jsonl
+*.csv
+
+# Saved CrowdWorks pages used for offline testing (contain personal info)
+list.md
+one user.md
+*.html
+!public/*.html
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

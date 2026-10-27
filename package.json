@@ -1,0 +1,23 @@
+{
+  "name": "cw-info-scraper",
+  "version": "0.1.0",
+  "description": "Paginated scraper for CrowdWorks public employee listings (via proxy)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "sample": "node src/sample.js",
+    "server": "node src/server.js",
+    "import": "node src/import.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.21.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mongodb": "^7.7.0"
+  }
+}
