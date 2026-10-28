@@ -51,7 +51,7 @@
       <table id="table">
         <thead>
           <tr>
-            <th>ID</th><th>Name</th><th>Email</th><th>Gender / Age</th><th>Prefecture</th>
+            <th class="view-col" aria-label="View"></th><th>ID</th><th>Name</th><th>Email</th><th>Gender / Age</th><th>Prefecture</th>
             <th>Occupation</th><th class="num">Rating</th><th class="num">Contracts</th>
             <th class="num">Views</th><th>Last access</th><th>Comment</th>
           </tr>
@@ -69,10 +69,14 @@
     </div>
   </main>
 
-  <aside id="detail" class="detail" hidden>
-    <button id="close" class="close" type="button" aria-label="Close">×</button>
-    <div id="detailBody"></div>
-  </aside>
+  <div id="detail" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <button id="close" class="close" type="button" aria-label="Close">×</button>
+      <div id="detailBody"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="app.js"></script>
 </body>

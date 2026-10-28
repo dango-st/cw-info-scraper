@@ -30,7 +30,19 @@ async function copyText(text) {
   ta.remove();
 }
 
-const copyButton = (email) => `<button class="copy" type="button" data-copy="${esc(email)}" title="Copy ${esc(email)}">Copy</button>`;
+const EYE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+
+let toastTimer;
+function toast(message, isError = false) {
+  const el = $('#toast');
+  el.textContent = message;
+  el.classList.toggle('error', isError);
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), isError ? 6000 : 1800);
+}
+
+const copyButton = (text) => `<button class="copy" type="button" data-copy="${esc(text)}" title="Copy ${esc(text)}">Copy</button>`;
 
 /* ---------- facets / dropdowns ---------- */
 
@@ -61,13 +73,14 @@ async function loadUsers() {
   state.total = data.total;
 
   if (!data.items.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="empty">No users match these filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="empty">No users match these filters.</td></tr>`;
   } else {
     tbody.innerHTML = data.items.map((u) => `
       <tr data-id="${esc(u._id)}" class="${u._id === state.activeId ? 'active' : ''}">
-        <td class="muted">${esc(u._id)}</td>
-        <td>${esc(u.displayName)}${u.error ? ' <span title="profile fetch failed">⚠</span>' : ''}</td>
-        <td class="email">${list(u.emails).map((e) => `<div class="email-line"><span>${esc(e)}</span>${copyButton(e)}</div>`).join('') || '<span class="muted">–</span>'}</td>
+        <td class="view-col"><button class="eye" type="button" data-view="${esc(u._id)}" title="View details" aria-label="View details for ${esc(u.displayName)}">${EYE_ICON}</button></td>
+        <td><a href="${esc(u.profileUrl || `https://crowdworks.jp/public/employees/${u._id}`)}" target="_blank" rel="noopener" title="Open CrowdWorks profile">${esc(u._id)}</a></td>
+        <td><div class="copy-line"><span>${esc(u.displayName)}${u.error ? ' <span title="profile fetch failed">⚠</span>' : ''}</span>${u.displayName ? copyButton(u.displayName) : ''}</div></td>
+        <td class="email">${list(u.emails).map((e) => `<div class="copy-line"><span>${esc(e)}</span>${copyButton(e)}</div>`).join('') || '<span class="muted">–</span>'}</td>
         <td>${[u.gender, u.ageRange].filter(Boolean).map(esc).join(' / ') || '<span class="muted">–</span>'}</td>
         <td>${dash(u.prefecture)}</td>
         <td class="wrap">${list(u.occupations).map(esc).join(', ') || '<span class="muted">–</span>'}</td>
@@ -102,7 +115,7 @@ async function openDetail(id) {
   const emails = list(u.emails);
 
   $('#detailBody').innerHTML = `
-    <h2>${esc(u.displayName)}</h2>
+    <h2 id="detailTitle">${esc(u.displayName)} ${u.displayName ? copyButton(u.displayName) : ''}</h2>
     <div class="muted">${esc(u.headline)}</div>
     <p><a href="${esc(u.profileUrl)}" target="_blank" rel="noopener">Open on CrowdWorks ↗</a></p>
 
@@ -176,11 +189,18 @@ async function openDetail(id) {
     <details><summary>Raw JSON</summary><pre class="raw">${esc(JSON.stringify(u, null, 2))}</pre></details>
   `;
   $('#detail').hidden = false;
-  $('#detail').scrollTop = 0;
+  $('#detail .modal').scrollTop = 0;
+  document.body.classList.add('modal-open');
+  $('#close').focus();
 }
 
 function closeDetail() {
+  if ($('#detail').hidden) return;
+  // Save a comment that's still being edited before the modal disappears.
+  const active = document.activeElement;
+  if (active?.matches('.comment')) active.blur();
   $('#detail').hidden = true;
+  document.body.classList.remove('modal-open');
   state.activeId = null;
   document.querySelectorAll('tbody tr.active').forEach((tr) => tr.classList.remove('active'));
 }
@@ -197,12 +217,15 @@ $('#reset').addEventListener('click', () => { form.reset(); state.page = 1; load
 $('#prev').addEventListener('click', () => { state.page--; loadUsers(); });
 $('#next').addEventListener('click', () => { state.page++; loadUsers(); });
 $('#limit').addEventListener('change', (e) => { state.limit = +e.target.value; state.page = 1; loadUsers(); });
+// Only the eye button opens the details; the rest of the row is left for copying and comments.
 tbody.addEventListener('click', (e) => {
-  if (e.target.closest('button, input, textarea, a')) return; // copy button / comment box
-  const tr = e.target.closest('tr[data-id]');
-  if (tr) openDetail(tr.dataset.id);
+  const btn = e.target.closest('[data-view]');
+  if (btn) openDetail(btn.dataset.view).catch((err) => toast(`Could not load user: ${err.message}`, true));
 });
 $('#close').addEventListener('click', closeDetail);
+$('#detail').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeDetail(); // click on the dark backdrop
+});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !e.target.matches('.comment')) closeDetail();
 });
@@ -235,10 +258,17 @@ async function saveComment(el) {
       if (other.dataset.commentFor === id) other.value = comment;
     });
     el.classList.add('saved');
+    el.title = '';
     setTimeout(() => el.classList.remove('saved'), 1200);
+    toast('Comment saved');
   } catch (err) {
     el.classList.add('error');
     el.title = `Not saved: ${err.message}`;
+    const hint = err.message.startsWith('404') && !err.message.includes('not found')
+      ? ' — the server is running old code, restart it with `npm run server`'
+      : '';
+    const reason = err.message.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120);
+    toast(`Comment NOT saved: ${reason}${hint}`, true);
   }
 }
 document.addEventListener('change', (e) => {
@@ -259,5 +289,5 @@ document.addEventListener('keydown', (e) => {
   $('#limit').value = String(state.limit);
   await loadUsers();
 })().catch((err) => {
-  tbody.innerHTML = `<tr><td colspan="11" class="empty">Failed to load: ${esc(err.message)}</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="12" class="empty">Failed to load: ${esc(err.message)}</td></tr>`;
 });
