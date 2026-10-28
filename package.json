@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "sample": "node src/sample.js",
-    "server": "node src/server.js",
+    "server": "node --watch-path=src --watch-path=.env src/server.js",
     "import": "node src/import.js",
     "translate-db": "node src/translate-db.js"
   },

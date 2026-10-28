@@ -48,7 +48,8 @@ const copyButton = (text) => `<button class="copy" type="button" data-copy="${es
 
 async function loadFacets() {
   const f = await getJson('/api/facets');
-  $('#stats').innerHTML = `<b>${f.total.toLocaleString()}</b> users · <b>${f.withEmail.toLocaleString()}</b> with email`;
+  $('#stats').innerHTML = `<b>${f.total.toLocaleString()}</b> users · <b>${f.withEmail.toLocaleString()}</b> with email`
+    + (f.source ? ` · <span title="MongoDB cluster / database">${esc(f.source.host)} / ${esc(f.source.db)}</span>` : '');
   const fill = (name, values) => {
     const sel = form.elements[name];
     for (const v of values) sel.add(new Option(v, v));

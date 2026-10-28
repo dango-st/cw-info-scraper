@@ -1,5 +1,12 @@
 import { MongoClient } from 'mongodb';
 
+/** "mongodb://user:pass@a.x.net:27017,b.x.net/..." -> "a.x.net (+1)" — credentials never included. */
+export function describeMongoHost(uri) {
+  const hosts = uri.replace(/^mongodb(\+srv)?:\/\/([^@/]*@)?/, '').split(/[/?]/)[0].split(',');
+  const first = hosts[0].replace(/:\d+$/, '');
+  return hosts.length > 1 ? `${first} (+${hosts.length - 1})` : first;
+}
+
 /**
  * Connect and return { client, users, untranslatedTerms }.
  * `users` holds scraped users; `untranslatedTerms` holds Japanese terms

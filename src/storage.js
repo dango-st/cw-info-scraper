@@ -26,5 +26,10 @@ export function createMongoStorage(collection, extra = {}) {
   return {
     describe: () => `MongoDB ${collection.dbName}.${collection.collectionName}`,
     append: (users) => upsertUsers(collection, users, extra),
+    /** Which of `ids` are already saved. */
+    async existingIds(ids) {
+      const docs = await collection.find({ _id: { $in: ids } }, { projection: { _id: 1 } }).toArray();
+      return new Set(docs.map((d) => d._id));
+    },
   };
 }

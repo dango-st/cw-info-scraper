@@ -20,9 +20,10 @@ copy .env.example .env      # set MONGODB_URI (required) and MONGODB_DB
 npm start -- "https://crowdworks.jp/public/employees?category=employees&keywords=%40gmail.com&page=1"
 ```
 
-Each user is saved as soon as it's scraped, keyed by CrowdWorks ID, so running
-again updates existing records instead of duplicating them. Comments added in the
-viewer are never overwritten by a re-scrape.
+Each user is saved as soon as it's scraped, keyed by CrowdWorks ID. Users already
+in the database are always skipped (their profile page isn't fetched again), so
+re-running a search only adds new users and leaves saved records and comments
+untouched.
 
 ## Browse
 

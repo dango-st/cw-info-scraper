@@ -28,8 +28,8 @@ async function main() {
   console.log(`Connected to ${storage.describe()}`);
 
   try {
-    const { total, pagesFetched } = await scrape(startUrl, config, storage);
-    console.log(`\nDone: ${total} users from ${pagesFetched} page(s) saved to ${storage.describe()}.`);
+    const { saved, skipped, pagesFetched } = await scrape(startUrl, config, storage);
+    console.log(`\nDone: ${pagesFetched} page(s) — ${saved} new users saved, ${skipped} already saved (skipped) — ${storage.describe()}.`);
   } finally {
     // Also runs after a crash, so terms found before it aren't lost.
     await reportUntranslated(untranslatedTerms).catch((err) => console.warn('Could not save untranslated terms:', err.message));

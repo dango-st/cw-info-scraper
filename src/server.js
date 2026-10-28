@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { config } from './config.js';
-import { connectDb } from './db.js';
+import { connectDb, describeMongoHost } from './db.js';
 import { CSV_HEADER, toCsvRow } from './storage.js';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -50,6 +50,8 @@ function buildSort(q) {
 }
 
 const { users } = await connectDb(config);
+// Shown in the viewer header so it's obvious which database is being browsed.
+const SOURCE = { host: describeMongoHost(config.mongoUri), db: config.mongoDb };
 const app = express();
 app.use(express.static(PUBLIC_DIR));
 app.use(express.json());
@@ -112,7 +114,7 @@ app.get('/api/facets', async (req, res, next) => {
       distinct('occupations'),
       distinct('searchKeywords'),
     ]);
-    res.json({ total, withEmail, genders, ageRanges, prefectures, occupations, searchKeywords });
+    res.json({ total, withEmail, genders, ageRanges, prefectures, occupations, searchKeywords, source: SOURCE });
   } catch (err) {
     next(err);
   }
@@ -140,4 +142,5 @@ app.use((err, req, res, next) => {
 
 app.listen(config.port, () => {
   console.log(`Viewer running at http://localhost:${config.port}`);
+  console.log(`Reading from ${SOURCE.host} / ${SOURCE.db}.users`);
 });

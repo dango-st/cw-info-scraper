@@ -22,15 +22,17 @@ async function scrapeUser(client, listUser, config) {
 
 /**
  * Walk page = startPage, startPage+1, ... until a page returns no users
- * (or only users we've already seen, which happens when the site clamps
- * out-of-range pages to the last page). For each user, also fetch their
- * profile page and save the merged record.
+ * (or only users we've already seen in this run, which happens when the site
+ * clamps out-of-range pages to the last page). For each user not already in
+ * the database, fetch their profile page and save the merged record. Users
+ * already saved are skipped, however old their record is.
  */
-export async function scrape(baseUrl, config, storage) {
-  const client = createClient(config);
+export async function scrape(baseUrl, config, storage, client = createClient(config)) {
   const seen = new Set();
   let page = config.startPage;
   let pagesFetched = 0;
+  let saved = 0;
+  let skipped = 0;
 
   while (true) {
     if (config.maxPages && pagesFetched >= config.maxPages) {
@@ -51,24 +53,33 @@ export async function scrape(baseUrl, config, storage) {
     const { users, resultCountText } = parseListPage(html);
     if (pagesFetched === 1 && resultCountText) console.log(`  ${resultCountText}`);
 
-    const fresh = users.filter((u) => !seen.has(u.id));
-    if (!fresh.length) {
-      console.log('  no new users on this page — done.');
+    if (!users.length) {
+      console.log('  no users on this page — done.');
       break;
     }
+    const fresh = users.filter((u) => !seen.has(u.id));
+    if (!fresh.length) {
+      console.log('  same users as an earlier page (past the last page) — done.');
+      break;
+    }
+    fresh.forEach((u) => seen.add(u.id));
 
-    for (const [i, listUser] of fresh.entries()) {
-      seen.add(listUser.id);
+    const existing = await storage.existingIds(fresh.map((u) => u.id));
+    const toScrape = fresh.filter((u) => !existing.has(u.id));
+    skipped += fresh.length - toScrape.length;
+    console.log(`  ${toScrape.length} new, ${fresh.length - toScrape.length} already saved (skipped)`);
+
+    for (const [i, listUser] of toScrape.entries()) {
       const user = await scrapeUser(client, listUser, config);
       await storage.append([{ ...user, page }]);
-      console.log(`  (${i + 1}/${fresh.length}) ${user.id} ${user.displayName} ${user.emails.join(' ')}`);
+      saved++;
+      console.log(`  (${i + 1}/${toScrape.length}) ${user.id} ${user.displayName} ${user.emails.join(' ')}`);
       await sleep(config.detailDelayMs);
     }
-    console.log(`  page ${page} done (total ${seen.size})`);
 
     page++;
     await sleep(config.delayMs);
   }
 
-  return { total: seen.size, pagesFetched };
+  return { saved, skipped, pagesFetched };
 }
