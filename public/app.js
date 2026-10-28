@@ -14,11 +14,23 @@ function filterParams() {
   return params;
 }
 
-async function getJson(url) {
-  const res = await fetch(url);
+async function getJson(url, options) {
+  const res = await fetch(url, options);
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   return res.json();
 }
+
+/** navigator.clipboard only exists on https/localhost; fall back for http://<LAN IP>. */
+async function copyText(text) {
+  if (navigator.clipboard) return navigator.clipboard.writeText(text);
+  const ta = Object.assign(document.createElement('textarea'), { value: text });
+  document.body.append(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+
+const copyButton = (email) => `<button class="copy" type="button" data-copy="${esc(email)}" title="Copy ${esc(email)}">Copy</button>`;
 
 /* ---------- facets / dropdowns ---------- */
 
@@ -49,13 +61,13 @@ async function loadUsers() {
   state.total = data.total;
 
   if (!data.items.length) {
-    tbody.innerHTML = `<tr><td colspan="10" class="empty">No users match these filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="empty">No users match these filters.</td></tr>`;
   } else {
     tbody.innerHTML = data.items.map((u) => `
       <tr data-id="${esc(u._id)}" class="${u._id === state.activeId ? 'active' : ''}">
         <td class="muted">${esc(u._id)}</td>
         <td>${esc(u.displayName)}${u.error ? ' <span title="profile fetch failed">⚠</span>' : ''}</td>
-        <td class="email">${list(u.emails).map(esc).join('<br>') || '<span class="muted">–</span>'}</td>
+        <td class="email">${list(u.emails).map((e) => `<div class="email-line"><span>${esc(e)}</span>${copyButton(e)}</div>`).join('') || '<span class="muted">–</span>'}</td>
         <td>${[u.gender, u.ageRange].filter(Boolean).map(esc).join(' / ') || '<span class="muted">–</span>'}</td>
         <td>${dash(u.prefecture)}</td>
         <td class="wrap">${list(u.occupations).map(esc).join(', ') || '<span class="muted">–</span>'}</td>
@@ -63,6 +75,7 @@ async function loadUsers() {
         <td class="num">${dash(u.contractCount)}</td>
         <td class="num">${dash(u.viewCount)}</td>
         <td>${fmtDate(u.lastAccessAt) || '<span class="muted">–</span>'}</td>
+        <td><input class="comment" data-comment-for="${esc(u._id)}" value="${esc(u.comment)}" placeholder="Add comment…" maxlength="2000"></td>
       </tr>`).join('');
   }
 
@@ -95,8 +108,12 @@ async function openDetail(id) {
 
     <h3>Contact</h3>
     <div class="emails">${emails.length
-      ? emails.map((e) => `${esc(e)} <button class="copy" type="button" data-copy="${esc(e)}">Copy</button>`).join('<br>')
+      ? emails.map((e) => `${esc(e)} ${copyButton(e)}`).join('<br>')
       : '<span class="muted">No email found</span>'}</div>
+
+    <h3>Comment</h3>
+    <textarea class="comment" data-comment-for="${esc(u._id)}" rows="3" maxlength="2000" placeholder="Add comment…">${esc(u.comment)}</textarea>
+    <div class="muted small">${u.commentUpdatedAt ? `Saved ${esc(fmtDate(u.commentUpdatedAt))}` : 'Saved automatically when you click away'}</div>
 
     <h3>Profile</h3>
     ${kv([
@@ -106,7 +123,7 @@ async function openDetail(id) {
       ['Age', esc(u.ageRange)],
       ['Prefecture', esc(u.prefecture)],
       ['Status', esc(u.statusText || u.status)],
-      ['Hourly wage', u.minHourlyWage != null ? `${esc(u.minHourlyWage)} 〜 ${esc(u.maxHourlyWage ?? '')} 円` : ''],
+      ['Hourly wage', u.minHourlyWage != null ? `${esc(u.minHourlyWage)} ~ ${esc(u.maxHourlyWage ?? '')} JPY` : ''],
       ['Hours / week', esc(u.hoursPerWeek)],
       ['Web meeting', esc(u.webMeeting)],
       ['Registered', esc(u.registeredAt)],
@@ -181,17 +198,54 @@ $('#prev').addEventListener('click', () => { state.page--; loadUsers(); });
 $('#next').addEventListener('click', () => { state.page++; loadUsers(); });
 $('#limit').addEventListener('change', (e) => { state.limit = +e.target.value; state.page = 1; loadUsers(); });
 tbody.addEventListener('click', (e) => {
+  if (e.target.closest('button, input, textarea, a')) return; // copy button / comment box
   const tr = e.target.closest('tr[data-id]');
   if (tr) openDetail(tr.dataset.id);
 });
 $('#close').addEventListener('click', closeDetail);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail(); });
-$('#detail').addEventListener('click', (e) => {
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !e.target.matches('.comment')) closeDetail();
+});
+
+// Copy buttons (table and detail panel).
+document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-copy]');
   if (!btn) return;
-  navigator.clipboard.writeText(btn.dataset.copy);
-  btn.textContent = 'Copied';
+  try {
+    await copyText(btn.dataset.copy);
+    btn.textContent = 'Copied';
+  } catch {
+    btn.textContent = 'Failed';
+  }
   setTimeout(() => (btn.textContent = 'Copy'), 1200);
+});
+
+// Comments save when the box loses focus (or Enter in the table's one-line box).
+async function saveComment(el) {
+  const id = el.dataset.commentFor;
+  el.classList.remove('saved', 'error');
+  try {
+    const { comment } = await getJson(`/api/users/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment: el.value }),
+    });
+    // Keep the table row and the detail panel in sync.
+    document.querySelectorAll('.comment').forEach((other) => {
+      if (other.dataset.commentFor === id) other.value = comment;
+    });
+    el.classList.add('saved');
+    setTimeout(() => el.classList.remove('saved'), 1200);
+  } catch (err) {
+    el.classList.add('error');
+    el.title = `Not saved: ${err.message}`;
+  }
+}
+document.addEventListener('change', (e) => {
+  if (e.target.matches('.comment')) saveComment(e.target);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches('input.comment')) e.target.blur();
 });
 
 /* ---------- init: restore filters from the URL ---------- */
@@ -205,5 +259,5 @@ $('#detail').addEventListener('click', (e) => {
   $('#limit').value = String(state.limit);
   await loadUsers();
 })().catch((err) => {
-  tbody.innerHTML = `<tr><td colspan="10" class="empty">Failed to load: ${esc(err.message)}</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="11" class="empty">Failed to load: ${esc(err.message)}</td></tr>`;
 });

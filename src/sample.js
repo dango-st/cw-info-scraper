@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { config } from './config.js';
 import { mergeUser, parseListPage, parseUserPage } from './parser.js';
 import { createFileStorage } from './storage.js';
+import { reportUntranslated, toEnglish } from './translate.js';
 
 const [listFile = 'list.md', userFile = 'one user.md'] = process.argv.slice(2);
 
@@ -13,9 +14,10 @@ const detail = parseUserPage(fs.readFileSync(userFile, 'utf8'));
 const detailId = detail.id;
 
 const storage = createFileStorage(config.outputDir, 'sample');
-const records = users.map((u) => ({ ...mergeUser(u, u.id === detailId ? detail : null), page: 1 }));
+const records = users.map((u) => ({ ...toEnglish(mergeUser(u, u.id === detailId ? detail : null)), page: 1 }));
 await storage.append(records);
 
 console.log(`${resultCountText} — parsed ${users.length} users, profile page matched user ${detailId}`);
 console.log(JSON.stringify(records.find((r) => r.id === detailId), null, 2));
 console.log(`\n${storage.describe().join('\n')}`);
+await reportUntranslated(`${config.outputDir}/untranslated-terms.txt`);

@@ -1,8 +1,10 @@
+import path from 'node:path';
 import readline from 'node:readline/promises';
 import { config } from './config.js';
 import { connectDb } from './db.js';
 import { scrape } from './scraper.js';
 import { combineStorage, createFileStorage, createMongoStorage } from './storage.js';
+import { reportUntranslated } from './translate.js';
 
 async function getStartUrl() {
   if (process.argv[2]) return process.argv[2];
@@ -33,6 +35,7 @@ async function main() {
     const { total, pagesFetched } = await scrape(startUrl, config, storage);
     console.log(`\nDone: ${total} users from ${pagesFetched} page(s).`);
     storage.describe().forEach((d) => console.log(`  ${d}`));
+    await reportUntranslated(path.join(config.outputDir, 'untranslated-terms.txt'));
   } finally {
     await client.close();
   }

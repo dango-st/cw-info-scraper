@@ -12,7 +12,7 @@ export const CSV_COLUMNS = [
   'occupations', 'jobCategories', 'skills',
   'ratingAverage', 'ratingCount', 'projectFinishedRate', 'contractCount',
   'identityVerified', 'proCrowdworker', 'viewCount', 'watchlistCount',
-  'introduction', 'page', 'error',
+  'introduction', 'comment', 'page', 'error',
 ];
 
 const csvCell = (v) => {

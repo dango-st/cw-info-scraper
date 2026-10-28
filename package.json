@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "sample": "node src/sample.js",
     "server": "node src/server.js",
-    "import": "node src/import.js"
+    "import": "node src/import.js",
+    "translate-db": "node src/translate-db.js"
   },
   "engines": {
     "node": ">=18"

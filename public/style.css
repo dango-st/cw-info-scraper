@@ -92,7 +92,17 @@ tbody tr.active { background: var(--accent-soft); }
 .chip { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
 .intro { white-space: pre-wrap; background: var(--bg); border-radius: 6px; padding: 10px 12px; margin: 0; }
 .emails { font-family: ui-monospace, Consolas, monospace; font-size: 15px; }
-.copy { font-size: 12px; padding: 2px 8px; margin-left: 6px; }
+.copy { font-size: 12px; padding: 2px 8px; margin-left: 6px; font-family: system-ui, sans-serif; }
+.email-line { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.email-line + .email-line { margin-top: 4px; }
+.small { font-size: 12px; margin-top: 4px; }
+
+/* Comment boxes (table row and detail panel) */
+input.comment { width: 220px; padding: 4px 8px; }
+textarea.comment { width: 100%; resize: vertical; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.comment:focus { outline: none; border-color: var(--accent); }
+.comment.saved { border-color: var(--good); }
+.comment.error { border-color: var(--bad); }
 .item { border-top: 1px solid var(--border); padding: 8px 0; }
 .item:first-child { border-top: 0; }
 .score { font-weight: 600; }

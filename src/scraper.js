@@ -1,5 +1,6 @@
 import { createClient, fetchHtml, sleep } from './http.js';
 import { mergeUser, parseListPage, parseUserPage } from './parser.js';
+import { toEnglish } from './translate.js';
 
 /** Return a copy of `baseUrl` with its `page` query parameter set to `page`. */
 export function withPage(baseUrl, page) {
@@ -12,10 +13,10 @@ export function withPage(baseUrl, page) {
 async function scrapeUser(client, listUser, config) {
   try {
     const html = await fetchHtml(client, listUser.profileUrl, config);
-    return mergeUser(listUser, html ? parseUserPage(html) : null);
+    return toEnglish(mergeUser(listUser, html ? parseUserPage(html) : null));
   } catch (err) {
     console.warn(`    ! ${listUser.id}: ${err.message}`);
-    return { ...mergeUser(listUser, null), error: err.message };
+    return { ...toEnglish(mergeUser(listUser, null)), error: err.message };
   }
 }
 

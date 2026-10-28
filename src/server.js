@@ -16,8 +16,10 @@ const SORTABLE = new Set([
 const LIST_PROJECTION = {
   displayName: 1, emails: 1, headline: 1, gender: 1, ageRange: 1, prefecture: 1,
   occupations: 1, ratingAverage: 1, ratingCount: 1, contractCount: 1, viewCount: 1,
-  lastAccessAt: 1, statusText: 1, minHourlyWage: 1, profileUrl: 1, error: 1,
+  lastAccessAt: 1, statusText: 1, minHourlyWage: 1, profileUrl: 1, error: 1, comment: 1,
 };
+
+const MAX_COMMENT_LENGTH = 2000;
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -27,7 +29,7 @@ function buildFilter(q) {
   if (q.q) {
     const re = new RegExp(escapeRegex(q.q.trim()), 'i');
     and.push({
-      $or: ['_id', 'displayName', 'emails', 'introduction', 'headline', 'occupations', 'jobCategories', 'skills']
+      $or: ['_id', 'displayName', 'emails', 'introduction', 'headline', 'occupations', 'jobCategories', 'skills', 'comment']
         .map((field) => ({ [field]: re })),
     });
   }
@@ -36,6 +38,8 @@ function buildFilter(q) {
   }
   if (q.hasEmail === '1') and.push({ 'emails.0': { $exists: true } });
   if (q.hasEmail === '0') and.push({ 'emails.0': { $exists: false } });
+  if (q.hasComment === '1') and.push({ comment: { $nin: [null, ''] } });
+  if (q.hasComment === '0') and.push({ comment: { $in: [null, ''] } });
   if (q.minRating) and.push({ ratingAverage: { $gte: Number(q.minRating) } });
   return and.length ? { $and: and } : {};
 }
@@ -48,6 +52,7 @@ function buildSort(q) {
 const { users } = await connectDb(config);
 const app = express();
 app.use(express.static(PUBLIC_DIR));
+app.use(express.json());
 
 app.get('/api/users', async (req, res, next) => {
   try {
@@ -70,6 +75,25 @@ app.get('/api/users/:id', async (req, res, next) => {
     const user = await users.findOne({ _id: req.params.id });
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Save the viewer's comment on a user. The scraper never overwrites this field. */
+app.patch('/api/users/:id', async (req, res, next) => {
+  try {
+    const { comment } = req.body ?? {};
+    if (typeof comment !== 'string' || comment.length > MAX_COMMENT_LENGTH) {
+      return res.status(400).json({ error: `comment must be a string of at most ${MAX_COMMENT_LENGTH} characters` });
+    }
+    const result = await users.findOneAndUpdate(
+      { _id: req.params.id },
+      { $set: { comment: comment.trim(), commentUpdatedAt: new Date() } },
+      { returnDocument: 'after', projection: { comment: 1, commentUpdatedAt: 1 } },
+    );
+    if (!result) return res.status(404).json({ error: 'not found' });
+    res.json(result);
   } catch (err) {
     next(err);
   }
