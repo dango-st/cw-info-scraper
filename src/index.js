@@ -1,9 +1,8 @@
-import path from 'node:path';
 import readline from 'node:readline/promises';
 import { config } from './config.js';
 import { connectDb } from './db.js';
 import { scrape } from './scraper.js';
-import { combineStorage, createFileStorage, createMongoStorage } from './storage.js';
+import { createMongoStorage } from './storage.js';
 import { reportUntranslated } from './translate.js';
 
 async function getStartUrl() {
@@ -24,19 +23,16 @@ async function main() {
     process.exit(1);
   }
 
-  const { client, users } = await connectDb(config);
-  console.log(`Connected to MongoDB (${config.mongoDb}.users)`);
-
-  const storages = [createMongoStorage(users, { searchKeywords })];
-  if (config.saveFiles) storages.push(createFileStorage(config.outputDir));
-  const storage = combineStorage(...storages);
+  const { client, users, untranslatedTerms } = await connectDb(config);
+  const storage = createMongoStorage(users, { searchKeywords });
+  console.log(`Connected to ${storage.describe()}`);
 
   try {
     const { total, pagesFetched } = await scrape(startUrl, config, storage);
-    console.log(`\nDone: ${total} users from ${pagesFetched} page(s).`);
-    storage.describe().forEach((d) => console.log(`  ${d}`));
-    await reportUntranslated(path.join(config.outputDir, 'untranslated-terms.txt'));
+    console.log(`\nDone: ${total} users from ${pagesFetched} page(s) saved to ${storage.describe()}.`);
   } finally {
+    // Also runs after a crash, so terms found before it aren't lost.
+    await reportUntranslated(untranslatedTerms).catch((err) => console.warn('Could not save untranslated terms:', err.message));
     await client.close();
   }
 }

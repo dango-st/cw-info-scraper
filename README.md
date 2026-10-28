@@ -1,14 +1,17 @@
 # CrowdWorks user scraper
 
 Walks a CrowdWorks member search (`/public/employees?...&page=N`), opens each user's
-profile page, and saves the combined data to MongoDB (and optionally CSV/JSONL).
-A small web viewer lets you search and browse what's been saved.
+profile page, translates the fixed fields (prefecture, gender, age, occupations,
+categories, …) to English, and saves everything to MongoDB. A small web viewer lets
+you search, browse and comment on what's been saved.
+
+All data lives in MongoDB — nothing is written to local files.
 
 ## Setup
 
 ```
 npm install
-copy .env.example .env      # set MONGODB_URI if MongoDB isn't on localhost:27017
+copy .env.example .env      # set MONGODB_URI (required) and MONGODB_DB
 ```
 
 ## Scrape
@@ -17,8 +20,9 @@ copy .env.example .env      # set MONGODB_URI if MongoDB isn't on localhost:2701
 npm start -- "https://crowdworks.jp/public/employees?category=employees&keywords=%40gmail.com&page=1"
 ```
 
-Users are upserted by CrowdWorks ID, so running again updates existing records
-instead of duplicating them.
+Each user is saved as soon as it's scraped, keyed by CrowdWorks ID, so running
+again updates existing records instead of duplicating them. Comments added in the
+viewer are never overwritten by a re-scrape.
 
 ## Browse
 
@@ -26,23 +30,38 @@ instead of duplicating them.
 npm run server              # http://localhost:3000
 ```
 
-Search, filter (email / gender / age / prefecture / occupation / keyword), sort,
-click a row for the full profile, and export the filtered list as CSV.
+- Search and filter (email / comment / gender / age / prefecture / occupation / keyword), sort
+- Eye icon opens the full profile; the ID opens the CrowdWorks page
+- Copy buttons for name and email, a comment box on every row
+- Export the filtered list as CSV
+
+Restart the server after pulling new code.
 
 ## Other commands
 
 | Command | What it does |
 |---|---|
-| `npm run import -- file.jsonl` | Load a saved JSONL file into MongoDB |
-| `npm run sample` | Parse the saved `list.md` / `one user.md` offline into `output/sample.*` |
+| `npm run translate-db` | Re-translate every saved user (after adding terms to `src/dictionary.js`) |
+| `npm run import -- file.jsonl` | Load a JSONL backup into MongoDB |
+| `npm run sample` | Parse the saved `list.md` / `one user.md` and print the result (no DB) |
+
+Japanese terms with no translation yet are kept as-is and collected in the
+`untranslated_terms` collection. Add them to `src/dictionary.js` and run
+`npm run translate-db`.
+
+## MongoDB collections
+
+| Collection | Contents |
+|---|---|
+| `users` | One document per user, `_id` = CrowdWorks ID |
+| `untranslated_terms` | Japanese terms missing from the dictionary, with counts |
 
 ## Settings (.env)
 
 | Name | Default | |
 |---|---|---|
-| `MONGODB_URI` | `mongodb://127.0.0.1:27017` | |
-| `MONGODB_DB` | `crowdworks` | collection is `users` |
-| `SAVE_FILES` | `true` | also write CSV/JSONL to `OUTPUT_DIR` |
+| `MONGODB_URI` | — | **required** |
+| `MONGODB_DB` | `crowdworks` | |
 | `DELAY_MS` | `2000` | wait between list pages |
 | `DETAIL_DELAY_MS` | `1500` | wait between profile pages |
 | `MAX_PAGES` | `0` | 0 = until no more results |

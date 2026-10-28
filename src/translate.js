@@ -121,12 +121,21 @@ export function toEnglish(user) {
   return u;
 }
 
-/** Print and save (to `file`) the terms that still need a dictionary entry. */
-export async function reportUntranslated(file) {
+/**
+ * Report the terms that still need a dictionary entry. With a collection,
+ * they're saved to MongoDB (untranslated_terms); otherwise just printed.
+ */
+export async function reportUntranslated(untranslatedTerms) {
   if (!untranslated.size) return;
-  const fs = await import('node:fs');
-  const lines = [...untranslated].sort((a, b) => b[1] - a[1]).map(([t, n]) => `${n}\t${t}`);
-  fs.writeFileSync(file, lines.join('\n') + '\n');
-  console.log(`\n${untranslated.size} Japanese term(s) had no translation and were kept as-is — see ${file}`);
+  const sorted = [...untranslated].sort((a, b) => b[1] - a[1]);
+  console.log(`\n${untranslated.size} Japanese term(s) had no translation and were kept as-is:`);
+  sorted.slice(0, 20).forEach(([t, n]) => console.log(`  ${n}\t${t}`));
+  if (sorted.length > 20) console.log(`  … and ${sorted.length - 20} more`);
+  if (untranslatedTerms) {
+    const { saveUntranslatedTerms } = await import('./db.js');
+    await saveUntranslatedTerms(untranslatedTerms, untranslated);
+    console.log(`Saved to MongoDB collection "${untranslatedTerms.collectionName}".`);
+  }
   console.log('Add them to src/dictionary.js, then run `npm run translate-db` to update saved records.');
+  untranslated.clear();
 }

@@ -12,9 +12,7 @@ export const config = {
   detailDelayMs: int(process.env.DETAIL_DELAY_MS, 1500),
   maxRetries: int(process.env.MAX_RETRIES, 3),
   timeoutMs: int(process.env.TIMEOUT_MS, 30000),
-  outputDir: process.env.OUTPUT_DIR || 'output',
-  saveFiles: (process.env.SAVE_FILES ?? 'true') !== 'false',
-  mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017',
+  mongoUri: process.env.MONGODB_URI || '',
   mongoDb: process.env.MONGODB_DB || 'crowdworks',
   port: int(process.env.PORT, 3000),
 };
